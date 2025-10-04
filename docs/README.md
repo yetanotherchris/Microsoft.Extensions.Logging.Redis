@@ -11,10 +11,10 @@ var builder = Host.CreateDefaultBuilder(args)
     .ConfigureLogging(logging =>
     {
         logging.ClearProviders();
-        logging.AddRedis("localhost:6379", "logs");
+        logging.AddRedis("localhost:6379", "my-list-key");
     });
 ```
 
 
 ## Notes 
-The library was written using Claude and Codex, and using `serilog-sinks-redis` for implementation details.
+The library was written using Claude and Codex, and `serilog-sinks-redis` used as the reference implementation.
