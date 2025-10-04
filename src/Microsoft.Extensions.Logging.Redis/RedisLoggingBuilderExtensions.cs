@@ -4,6 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.Logging.Redis;
 
+/// <summary>
+/// Provides extension methods for adding Redis logging to an <see cref="ILoggingBuilder"/>.
+/// </summary>
 public static class RedisLoggingBuilderExtensions
 {
     /// <summary>
