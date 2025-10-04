@@ -1,0 +1,47 @@
+name: build-test-nugetpush
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore:
+      - ".github/**"
+      - ".gitignore"
+      - "README.md"
+      - "LICENSE"
+      - "CHANGELOG.md"
+      - "docs/**"
+      - "gitversion.yml"
+      - ".editorconfig"
+      - ".vs/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_NUMBER: "1.0"
+      PR_NUMBER: ${{ github.event.number }}
+      NUGET_KEY: ${{ secrets.NUGET_KEY }}
+
+    steps:
+      - name: Git - check out repository code
+        uses: actions/checkout@v4
+
+      - name: .NET - setup
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: .NET - restore & build
+        run: dotnet build
+
+      - name: .NET - test
+        run: dotnet test
+
+      - name: Nuget - push main package
+        if: github.event_name != 'pull_request' && github.actor == github.repository_owner
+        run: |
+          export PACKAGE_VERSION="$VERSION_NUMBER.$GITHUB_RUN_NUMBER"
+          dotnet pack src/Microsoft.Extensions.Logging.Redis/Microsoft.Extensions.Logging.Redis.csproj -c Release /p:PackageVersion=$PACKAGE_VERSION
+          dotnet nuget push "src/Microsoft.Extensions.Logging.Redis/bin/Release/Microsoft.Extensions.Logging.Redis.$PACKAGE_VERSION.nupkg" --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json
