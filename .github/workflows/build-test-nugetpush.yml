@@ -42,4 +42,4 @@ jobs:
         run: |
           export PACKAGE_VERSION="$VERSION_NUMBER.$GITHUB_RUN_NUMBER"
           dotnet pack src/Microsoft.Extensions.Logging.Redis/Microsoft.Extensions.Logging.Redis.csproj -c Release /p:PackageVersion=$PACKAGE_VERSION
-          dotnet nuget push "src/Microsoft.Extensions.Logging.Redis/bin/Release/Microsoft.Extensions.Logging.Redis.$PACKAGE_VERSION.nupkg" --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json
+          dotnet nuget push "src/Microsoft.Extensions.Logging.Redis/bin/Release/redis-ilogger.$PACKAGE_VERSION.nupkg" --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json
