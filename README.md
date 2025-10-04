@@ -14,3 +14,7 @@ var builder = Host.CreateDefaultBuilder(args)
         logging.AddRedis("localhost:6379", "logs");
     });
 ```
+
+
+## Notes 
+The library was written using Claude and Codex, and using `serilog-sinks-redis` for implementation details.
