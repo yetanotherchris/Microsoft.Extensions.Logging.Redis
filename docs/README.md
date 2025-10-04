@@ -1,4 +1,7 @@
 # Microsoft.Extensions.Logging.Redis
+
+[![NuGet](https://img.shields.io/nuget/v/redis-ilogger.svg)](https://www.nuget.org/packages/redis-ilogger/)
+
 A Redis `ILogger` provider that writes log events to a Redis list using [StackExchange.Redis](https://stackexchange.github.io/StackExchange.Redis/).
 
 ## Usage
