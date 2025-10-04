@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -7,12 +8,25 @@ namespace Microsoft.Extensions.Logging.Redis;
 internal sealed class RedisLoggerProvider : ILoggerProvider
 {
     private readonly string _listKey;
-    private readonly ConnectionMultiplexer _connection;
+    private readonly IConnectionMultiplexer _connection;
     private readonly IDatabase _database;
+    private readonly LogLevel _minimumLevel;
+    private readonly ConcurrentDictionary<string, RedisLogger> _loggers = new(StringComparer.Ordinal);
     private bool _disposed;
 
-    public RedisLoggerProvider(string connectionString, string listKey)
+    internal LogLevel MinimumLevel => _minimumLevel;
+
+    public RedisLoggerProvider(
+        string connectionString,
+        string listKey,
+        LogLevel minimumLevel = LogLevel.Trace,
+        IRedisConnectionFactory? connectionFactory = null)
     {
+        if (connectionString is null)
+        {
+            throw new ArgumentNullException(nameof(connectionString));
+        }
+
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new ArgumentException("The connection string must be provided.", nameof(connectionString));
@@ -24,7 +38,9 @@ internal sealed class RedisLoggerProvider : ILoggerProvider
         }
 
         _listKey = listKey;
-        _connection = ConnectionMultiplexer.Connect(connectionString);
+        _minimumLevel = minimumLevel;
+        var factory = connectionFactory ?? DefaultRedisConnectionFactory.Instance;
+        _connection = factory.Connect(connectionString);
         _database = _connection.GetDatabase();
     }
 
@@ -35,7 +51,7 @@ internal sealed class RedisLoggerProvider : ILoggerProvider
             throw new ObjectDisposedException(nameof(RedisLoggerProvider));
         }
 
-        return new RedisLogger(this, categoryName);
+        return _loggers.GetOrAdd(categoryName, static (name, provider) => new RedisLogger(provider, name), this);
     }
 
     internal void Write(RedisValue value)
@@ -57,5 +73,6 @@ internal sealed class RedisLoggerProvider : ILoggerProvider
 
         _disposed = true;
         _connection.Dispose();
+        _loggers.Clear();
     }
 }
