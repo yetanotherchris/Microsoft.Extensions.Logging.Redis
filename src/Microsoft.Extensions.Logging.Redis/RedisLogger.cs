@@ -27,7 +27,15 @@ internal sealed class RedisLogger : ILogger
 
     public IDisposable BeginScope<TState>(TState state) where TState : notnull => NoOpScope;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
+    public bool IsEnabled(LogLevel logLevel)
+    {
+        if (logLevel == LogLevel.None)
+        {
+            return false;
+        }
+
+        return logLevel >= _provider.MinimumLevel;
+    }
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
