@@ -1,56 +1,40 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
-using DotNet.Testcontainers.Configurations;
-using Docker.DotNet;
 using StackExchange.Redis;
 using Xunit;
 using Xunit.Sdk;
 
 namespace Microsoft.Extensions.Logging.Redis.Tests.Infrastructure;
 
+/// <summary>
+/// Base class for Redis integration tests using Docker Compose managed Redis instance
+/// Automatically starts and stops Redis container using DockerComposeRedisManager
+/// </summary>
 public abstract class RedisIntegrationTestBase : IAsyncLifetime
 {
-    private const int RedisPort = 6379;
     protected const string DefaultListKey = "logs";
 
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private IConnectionMultiplexer? _connectionMultiplexer;
+    private DockerComposeRedisManager? _redisManager;
 
-    protected ITestcontainersContainer? RedisContainer { get; private set; }
-    protected string ConnectionString { get; private set; } = string.Empty;
-    protected bool DockerAvailable { get; private set; }
+    protected string ConnectionString => _redisManager?.ConnectionString ?? "localhost:6379";
+    protected bool RedisAvailable => _redisManager?.IsAvailable ?? false;
 
     public async ValueTask InitializeAsync()
     {
         try
         {
-            var containerBuilder = new TestcontainersBuilder<TestcontainersContainer>()
-                .WithImage("redis:7-alpine")
-                .WithPortBinding(RedisPort, assignRandomHostPort: true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("redis-cli", "ping"))
-                .WithCleanUp(true)
-                .WithAutoRemove(true);
-
-            RedisContainer = containerBuilder.Build();
-            await RedisContainer.StartAsync();
-
-            var mappedPort = RedisContainer.GetMappedPublicPort(RedisPort);
-            ConnectionString = $"{RedisContainer.Hostname}:{mappedPort}";
-
-            await WaitForRedisAsync(TimeSpan.FromSeconds(30));
-            DockerAvailable = true;
+            _redisManager = await DockerComposeRedisManager.CreateAsync();
         }
-        catch (Exception ex) when (IsDockerUnavailable(ex))
+        catch (Exception ex)
         {
-            DockerAvailable = false;
+            Console.WriteLine($"Failed to start Redis container: {ex.Message}");
+            _redisManager = null;
         }
     }
 
@@ -62,21 +46,21 @@ public abstract class RedisIntegrationTestBase : IAsyncLifetime
             await _connectionMultiplexer.DisposeAsync();
         }
 
-        _connectionLock.Dispose();
-
-        if (DockerAvailable && RedisContainer is not null)
+        if (_redisManager is not null)
         {
-            await RedisContainer.DisposeAsync();
+            await _redisManager.DisposeAsync();
         }
+
+        _connectionLock.Dispose();
     }
 
     protected string GetConnectionString() => ConnectionString;
 
-    protected void SkipIfDockerUnavailable()
+    protected void SkipIfRedisUnavailable()
     {
-        if (!DockerAvailable)
+        if (!RedisAvailable)
         {
-            throw SkipException.ForSkip("Docker is required for integration tests.");
+            throw SkipException.ForSkip("Redis container failed to start - Docker/Rancher/Podman may not be available");
         }
     }
 
@@ -163,6 +147,7 @@ public abstract class RedisIntegrationTestBase : IAsyncLifetime
     {
         var deadline = DateTimeOffset.UtcNow + timeout;
         Exception? lastError = null;
+        
         while (DateTimeOffset.UtcNow < deadline)
         {
             try
@@ -180,16 +165,6 @@ public abstract class RedisIntegrationTestBase : IAsyncLifetime
             }
         }
 
-        throw new InvalidOperationException($"Redis did not become available within {timeout}.", lastError);
-    }
-
-    private static bool IsDockerUnavailable(Exception ex)
-    {
-        if (ex is DockerApiException or HttpRequestException or SocketException)
-        {
-            return true;
-        }
-
-        return ex is InvalidOperationException && ex.Message.Contains("Docker", StringComparison.OrdinalIgnoreCase);
+        throw new InvalidOperationException($"Redis did not become available within {timeout}. Make sure Redis is running on {ConnectionString}. Use: ./test-redis.ps1 start", lastError);
     }
 }

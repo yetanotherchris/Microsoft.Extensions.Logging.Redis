@@ -1,20 +1,18 @@
 name: build-test-nugetpush
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches: [ "main" ]
     paths-ignore:
-      - ".github/**"
-      - ".gitignore"
-      - "README.md"
-      - "LICENSE"
-      - "CHANGELOG.md"
-      - "docs/**"
-      - "gitversion.yml"
-      - ".editorconfig"
-      - ".vs/**"
+      - '**/*.md'
+      - '**/*.gitignore'
+      - '**/*.txt'
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.gitignore'
+      - '**/*.txt'
 
 jobs:
   build:

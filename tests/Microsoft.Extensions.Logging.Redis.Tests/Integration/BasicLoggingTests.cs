@@ -8,12 +8,15 @@ using Xunit;
 
 namespace Microsoft.Extensions.Logging.Redis.Tests.Integration;
 
+/// <summary>
+/// Integration tests using Docker Compose managed Redis
+/// </summary>
 public class BasicLoggingTests : RedisIntegrationTestBase
 {
     [Fact]
     public async Task LogInformation_WritesToRedisListWithCorrectKey()
     {
-        SkipIfDockerUnavailable();
+        SkipIfRedisUnavailable();
         var listKey = $"test-logs:{Guid.NewGuid():N}";
         var logger = RedisTestHelpers.CreateLogger(GetConnectionString(), listKey, "BasicLogging");
 
@@ -34,7 +37,7 @@ public class BasicLoggingTests : RedisIntegrationTestBase
     [Fact]
     public async Task LogMultipleLevels_AllAppearInRedis()
     {
-        SkipIfDockerUnavailable();
+        SkipIfRedisUnavailable();
         var listKey = $"multi-logs:{Guid.NewGuid():N}";
         var logger = RedisTestHelpers.CreateLogger(GetConnectionString(), listKey, "MultiLevel");
 
@@ -57,7 +60,7 @@ public class BasicLoggingTests : RedisIntegrationTestBase
     [Fact]
     public async Task LogWithCategory_IncludesCategoryInEntry()
     {
-        SkipIfDockerUnavailable();
+        SkipIfRedisUnavailable();
         var category = "MyApp.Services";
         var listKey = $"category-logs:{Guid.NewGuid():N}";
         var logger = RedisTestHelpers.CreateLogger(GetConnectionString(), listKey, category);
@@ -72,7 +75,7 @@ public class BasicLoggingTests : RedisIntegrationTestBase
     [Fact]
     public async Task LogWithEventId_IncludesEventIdInEntry()
     {
-        SkipIfDockerUnavailable();
+        SkipIfRedisUnavailable();
         var listKey = $"event-logs:{Guid.NewGuid():N}";
         var logger = RedisTestHelpers.CreateLogger(GetConnectionString(), listKey, "EventCategory");
 
@@ -82,5 +85,46 @@ public class BasicLoggingTests : RedisIntegrationTestBase
         var entry = RedisTestHelpers.Deserialize((await GetLogsFromRedisAsync(listKey)).Single());
         entry.EventId.ShouldBe(100);
         entry.EventName.ShouldBe("UserAction");
+    }
+
+    [Fact]
+    public async Task LogWithException_IncludesExceptionInEntry()
+    {
+        SkipIfRedisUnavailable();
+        var listKey = $"exception-logs:{Guid.NewGuid():N}";
+        var logger = RedisTestHelpers.CreateLogger(GetConnectionString(), listKey, "ExceptionCategory");
+
+        var exception = new InvalidOperationException("Test exception");
+        logger.LogError(exception, "An error occurred");
+
+        (await WaitForLogCountAsync(listKey, 1, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+        var entry = RedisTestHelpers.Deserialize((await GetLogsFromRedisAsync(listKey)).Single());
+        entry.Exception.ShouldNotBeNull();
+        entry.Exception.ShouldContain("InvalidOperationException");
+        entry.Exception.ShouldContain("Test exception");
+        entry.Message.ShouldBe("An error occurred");
+        entry.Level.ShouldBe("Error");
+    }
+
+    [Fact]
+    public async Task ConcurrentLogging_AllEntriesAppear()
+    {
+        SkipIfRedisUnavailable();
+        var listKey = $"concurrent-logs:{Guid.NewGuid():N}";
+        var logger = RedisTestHelpers.CreateLogger(GetConnectionString(), listKey, "ConcurrentCategory");
+
+        var tasks = Enumerable.Range(1, 10)
+            .Select(i => Task.Run(() => logger.LogInformation($"Message {i}")))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        (await WaitForLogCountAsync(listKey, 10, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+        var logs = await GetLogsFromRedisAsync(listKey);
+        logs.Count.ShouldBe(10);
+
+        var entries = logs.Select(RedisTestHelpers.Deserialize).ToArray();
+        entries.All(e => e.Level == "Information").ShouldBeTrue();
+        entries.All(e => e.Category == "ConcurrentCategory").ShouldBeTrue();
     }
 }
