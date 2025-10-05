@@ -1,6 +1,4 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.Logging.Redis;
 

@@ -31,7 +31,7 @@
 
   <!-- Include README file in the NuGet package -->
   <ItemGroup>
-    <None Include="../../docs/README.md" Pack="true" PackagePath="docs" Link="README.md" />
+    <None Include="../../docs/README-nuget.md" Pack="true" PackagePath="docs" Link="README.md" />
   </ItemGroup>
 
 </Project>

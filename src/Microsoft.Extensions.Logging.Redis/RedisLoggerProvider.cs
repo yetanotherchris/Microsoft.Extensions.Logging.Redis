@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Microsoft.Extensions.Logging.Redis;
